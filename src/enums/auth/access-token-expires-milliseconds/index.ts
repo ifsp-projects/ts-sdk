@@ -1,0 +1,1 @@
+export const ACCESS_TOKEN_EXPIRES_MILLISECONDS = 900000 as const;
