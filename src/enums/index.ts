@@ -4,3 +4,4 @@ export * from "./hubspot";
 export * from "./ong-category";
 export * from "./openai";
 export * from "./templates";
+export * from "./campaigns";
