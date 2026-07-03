@@ -1,5 +1,13 @@
 import { TemplateType } from "../template-type";
 
+export type ColorPalette = {
+  deep: string;
+  original: string;
+  shade: string;
+  tint: string;
+  ultra_light: string;
+};
+
 export const DEFAULT_TEMPLATE_COLORS = {
   primary: "#10b981",
   secondary: "#3b82f6",
@@ -7,7 +15,7 @@ export const DEFAULT_TEMPLATE_COLORS = {
   quarternary: "#f43f5e",
 } as const;
 
-export const DEFAULT_TEMPLATE_COLOR_PALLETES: Record<TemplateType, any> = {
+export const DEFAULT_TEMPLATE_COLOR_PALLETES = {
   primary: {
     deep: "#14532d",
     original: "#22c55e",
@@ -36,4 +44,4 @@ export const DEFAULT_TEMPLATE_COLOR_PALLETES: Record<TemplateType, any> = {
     tint: "#fda4af",
     ultra_light: "#ffe4e6",
   },
-} as const;
+} as const satisfies Record<TemplateType, ColorPalette>;

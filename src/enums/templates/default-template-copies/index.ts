@@ -674,3 +674,11 @@ export const PAGE_TEMPLATES = {
   tertiary: TERTIARY_TEMPLATE_DEFAULT_COPIES,
   quarternary: QUATERNARY_TEMPLATE_DEFAULT_COPIES,
 } as const;
+
+export type PrimaryTemplate = typeof PRIMARY_TEMPLATE_DEFAULT_COPIES;
+
+export type SecondaryTemplate = typeof SECONDARY_TEMPLATE_DEFAULT_COPIES;
+
+export type TertiaryTemplate = typeof TERTIARY_TEMPLATE_DEFAULT_COPIES;
+
+export type QuarternaryTemplate = typeof QUATERNARY_TEMPLATE_DEFAULT_COPIES;
