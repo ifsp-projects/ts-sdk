@@ -1,3 +1,5 @@
+import { Widen } from "../../../types/widen";
+
 export const PRIMARY_TEMPLATE_DEFAULT_COPIES = {
   header: {
     span: "Projeto sem fins lucrativos",
@@ -675,10 +677,10 @@ export const PAGE_TEMPLATES = {
   quarternary: QUATERNARY_TEMPLATE_DEFAULT_COPIES,
 } as const;
 
-export type PrimaryTemplate = typeof PRIMARY_TEMPLATE_DEFAULT_COPIES;
+export type PrimaryTemplate = Widen<typeof PRIMARY_TEMPLATE_DEFAULT_COPIES>;
 
-export type SecondaryTemplate = typeof SECONDARY_TEMPLATE_DEFAULT_COPIES;
+export type SecondaryTemplate = Widen<typeof SECONDARY_TEMPLATE_DEFAULT_COPIES>;
 
-export type TertiaryTemplate = typeof TERTIARY_TEMPLATE_DEFAULT_COPIES;
+export type TertiaryTemplate = Widen<typeof TERTIARY_TEMPLATE_DEFAULT_COPIES>;
 
-export type QuarternaryTemplate = typeof QUATERNARY_TEMPLATE_DEFAULT_COPIES;
+export type QuarternaryTemplate = Widen<typeof QUATERNARY_TEMPLATE_DEFAULT_COPIES>;
