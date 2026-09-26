@@ -1,0 +1,152 @@
+name: Publish TS SDK to AWS CodeArtifact
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Read package version
+        id: metadata
+        run: echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
+      - name: Install pnpm and dependencies
+        run: |
+          npm install --global pnpm@10.28.0
+          pnpm install --frozen-lockfile
+
+      - name: Build and pack
+        run: |
+          pnpm run build
+          npm pack --json --ignore-scripts | node -e '
+            let input = "";
+            process.stdin.on("data", chunk => input += chunk);
+            process.stdin.on("end", () => {
+              const files = new Set(JSON.parse(input)[0].files.map(file => file.path));
+              for (const file of ["dist/index.js", "dist/index.mjs", "dist/index.d.ts"]) {
+                if (!files.has(file)) throw new Error(`Package is missing ${file}`);
+              }
+              console.log("Package contains CommonJS, ESM, and TypeScript entry points.");
+            });'
+
+      - name: Save package for publishing
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ts-sdk-package
+          path: "*.tgz"
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+    concurrency:
+      group: ts-sdk-codeartifact-${{ needs.package.outputs.version }}
+      cancel-in-progress: false
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+      CODEARTIFACT_DOMAIN: ${{ secrets.CODEARTIFACT_DOMAIN }}
+      CODEARTIFACT_REPOSITORY: ${{ secrets.CODEARTIFACT_REPOSITORY }}
+    steps:
+      - name: Download package
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          name: ts-sdk-package
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Read package metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          packages=( *.tgz )
+          if [ "${#packages[@]}" -ne 1 ]; then
+            echo 'Expected exactly one SDK package archive.' >&2
+            exit 1
+          fi
+          mkdir package-info
+          tar -xzf "${packages[0]}" -C package-info package/package.json
+          echo "PACKAGE_TARBALL=${packages[0]}" >> "$GITHUB_ENV"
+          echo "PACKAGE_NAME=$(node -p 'require("./package-info/package/package.json").name')" >> "$GITHUB_ENV"
+          echo "PACKAGE_VERSION=$(node -p 'require("./package-info/package/package.json").version')" >> "$GITHUB_ENV"
+
+      - name: Assume AWS publish role
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_CODEARTIFACT_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          allowed-account-ids: ${{ env.AWS_ACCOUNT_ID }}
+
+      - name: Check whether this version is already published
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          error_file="${RUNNER_TEMP}/codeartifact-version-error"
+
+          if aws codeartifact describe-package-version \
+            --domain "$CODEARTIFACT_DOMAIN" \
+            --domain-owner "$AWS_ACCOUNT_ID" \
+            --repository "$CODEARTIFACT_REPOSITORY" \
+            --format npm \
+            --package "$PACKAGE_NAME" \
+            --package-version "$PACKAGE_VERSION" \
+            --query 'packageVersion.version' \
+            --output text 2> "$error_file"; then
+            echo 'exists=true' >> "$GITHUB_OUTPUT"
+            echo "$PACKAGE_NAME@$PACKAGE_VERSION already exists in CodeArtifact; skipping publish." >> "$GITHUB_STEP_SUMMARY"
+          elif grep -q 'ResourceNotFoundException' "$error_file"; then
+            echo 'exists=false' >> "$GITHUB_OUTPUT"
+          else
+            cat "$error_file" >&2
+            exit 1
+          fi
+
+      - name: Publish new version
+        if: steps.version.outputs.exists == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws codeartifact login \
+            --tool npm \
+            --domain "$CODEARTIFACT_DOMAIN" \
+            --domain-owner "$AWS_ACCOUNT_ID" \
+            --repository "$CODEARTIFACT_REPOSITORY" \
+            --duration-seconds 0
+          registry=$(aws codeartifact get-repository-endpoint \
+            --domain "$CODEARTIFACT_DOMAIN" \
+            --domain-owner "$AWS_ACCOUNT_ID" \
+            --repository "$CODEARTIFACT_REPOSITORY" \
+            --format npm \
+            --query repositoryEndpoint \
+            --output text)
+          npm publish "$PACKAGE_TARBALL" --registry "$registry" --ignore-scripts
+          echo "Published $PACKAGE_NAME@$PACKAGE_VERSION to AWS CodeArtifact." >> "$GITHUB_STEP_SUMMARY"
