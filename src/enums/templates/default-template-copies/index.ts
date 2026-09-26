@@ -182,7 +182,7 @@ export const SECONDARY_TEMPLATE_DEFAULT_COPIES = {
     title: "Veja como sua ajuda chega até quem mais precisa",
     description:
       "Nosso processo é simples e transparente: você doa, nós direcionamos os recursos para os projetos certos e você acompanha o impacto gerado em tempo real.",
-    heroImage: "/templates/undraw_how-it-works.svg",
+    heroImage: "https://media.istockphoto.com/id/1194548736/photo/homeless-male-on-the-street-getting-help-from-female.jpg?s=612x612&w=0&k=20&c=S7zg86Or_4KF8x9SDnM5mokxypyqHSiwBY6AACgfnYA=",
     anchor: {
       label: "Ver projetos ativos",
       href: "#",
